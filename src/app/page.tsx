@@ -1,0 +1,2 @@
+import {Header} from "@/components/Header";import {Hero} from "@/components/Hero";import {StorefrontSections} from "@/components/StorefrontSections";import {Footer} from "@/components/Footer";
+export default function HomePage(){return <><Header/><main><Hero/><StorefrontSections/></main><Footer/></>}
