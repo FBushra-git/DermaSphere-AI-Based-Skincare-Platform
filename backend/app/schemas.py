@@ -123,7 +123,21 @@ class RoutineCreate(BaseModel):
     routine_type: str = Field(default="custom", pattern="^(morning|evening|custom)$")
 
 
+class RoutineUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    description: str | None = None
+    routine_type: str | None = Field(default=None, pattern="^(morning|evening|custom)$")
+
+
 class RoutineItemInput(BaseModel):
     product_id: str
     sequence: int = Field(ge=1)
     step_note: str | None = Field(default=None, max_length=255)
+
+
+class InventoryUpdate(BaseModel):
+    available_quantity: int = Field(ge=0)
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(confirmed|processing|shipped|delivered)$")
