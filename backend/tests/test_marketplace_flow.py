@@ -143,6 +143,11 @@ def test_customer_seller_admin_flow(client_and_session):
     assert detail.status_code == 200
     assert detail.json()["ingredients"][0]["name"] == "Test Ceramide"
     assert detail.json()["suitable_skin_types"] == ["Test Combination"]
+    ingredient_detail = client.get(f"/api/ingredients/{ingredient_id}")
+    assert ingredient_detail.status_code == 200
+    assert ingredient_detail.json()["name"] == "Test Ceramide"
+    assert ingredient_detail.json()["products"][0]["id"] == product_id
+    assert client.get("/api/ingredients/missing").status_code == 404
 
     customer_signup = client.post(
         "/api/auth/register",

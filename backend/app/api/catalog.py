@@ -4,7 +4,18 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.core.database import get_db
-from app.models import Category, Ingredient, Role, SkinConcern, SkinType, User
+from app.models import (
+    Category,
+    Ingredient,
+    Inventory,
+    Product,
+    ProductStatus,
+    Role,
+    SkinConcern,
+    SkinType,
+    User,
+    product_ingredients,
+)
 from app.schemas import IngredientCreate, NamedRecord
 
 router = APIRouter(tags=["catalog"])
@@ -33,6 +44,42 @@ def list_ingredients(q: str | None = None, db: Session = Depends(get_db)):
     if q:
         stmt = stmt.where(Ingredient.name.ilike(f"%{q.strip()}%"))
     return db.scalars(stmt.limit(100)).all()
+
+
+@router.get("/api/ingredients/{ingredient_id}")
+def ingredient_detail(ingredient_id: str, db: Session = Depends(get_db)):
+    ingredient = db.get(Ingredient, ingredient_id)
+    if not ingredient:
+        raise HTTPException(status_code=404, detail="Ingredient not found")
+    products = db.execute(
+        select(Product, Inventory.available_quantity)
+        .join(product_ingredients, product_ingredients.c.product_id == Product.id)
+        .outerjoin(Inventory, Inventory.product_id == Product.id)
+        .where(
+            product_ingredients.c.ingredient_id == ingredient.id,
+            Product.status == ProductStatus.APPROVED,
+        )
+        .order_by(Product.name)
+    ).all()
+    return {
+        "id": ingredient.id,
+        "name": ingredient.name,
+        "description": ingredient.description,
+        "common_uses": ingredient.common_uses,
+        "benefits": ingredient.benefits,
+        "cautions": ingredient.cautions,
+        "products": [
+            {
+                "id": product.id,
+                "name": product.name,
+                "brand": product.brand,
+                "price": product.price,
+                "image_url": product.image_url,
+                "available_quantity": quantity or 0,
+            }
+            for product, quantity in products
+        ],
+    }
 
 
 @router.post("/api/admin/categories", status_code=201)
