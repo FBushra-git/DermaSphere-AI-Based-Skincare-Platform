@@ -22,6 +22,16 @@ def list_content(category: str | None = None, db: Session = Depends(get_db)):
     return db.scalars(stmt.limit(100)).all()
 
 
+@router.get("/api/admin/content")
+def list_admin_content(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.ADMIN)),
+):
+    return db.scalars(
+        select(EducationalContent).order_by(EducationalContent.created_at.desc())
+    ).all()
+
+
 @router.post("/api/admin/content", status_code=status.HTTP_201_CREATED)
 def create_content(
     payload: ContentCreate,

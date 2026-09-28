@@ -272,6 +272,24 @@ def test_customer_seller_admin_flow(client_and_session):
     )
     assert content.status_code == 201
     assert client.get("/api/content").json()[0]["title"] == "Skin barrier basics"
+    admin_content = client.get("/api/admin/content", headers=admin_headers)
+    assert admin_content.status_code == 200
+    content_id = content.json()["id"]
+    assert (
+        client.patch(
+            f"/api/admin/content/{content_id}",
+            headers=admin_headers,
+            json={"is_published": False},
+        ).status_code
+        == 200
+    )
+    assert client.get("/api/content").json() == []
+    assert (
+        client.delete(
+            f"/api/admin/content/{content_id}", headers=admin_headers
+        ).status_code
+        == 204
+    )
     reports = client.get("/api/admin/reports/overview", headers=admin_headers)
     assert reports.status_code == 200
     assert reports.json()["total_users"] == 3
