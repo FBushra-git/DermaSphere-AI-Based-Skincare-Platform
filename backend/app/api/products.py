@@ -10,6 +10,7 @@ from app.models import (
     Inventory,
     Product,
     ProductStatus,
+    Review,
     Role,
     SellerProfile,
     SkinConcern,
@@ -25,8 +26,24 @@ router = APIRouter(prefix="/api/products", tags=["products"])
 
 
 def product_query():
-    return select(Product, Inventory.available_quantity).outerjoin(
-        Inventory, Inventory.product_id == Product.id
+    reviews = (
+        select(
+            Review.product_id.label("product_id"),
+            func.avg(Review.rating).label("average_rating"),
+            func.count(Review.id).label("review_count"),
+        )
+        .group_by(Review.product_id)
+        .subquery()
+    )
+    return (
+        select(
+            Product,
+            Inventory.available_quantity,
+            func.coalesce(reviews.c.average_rating, 0),
+            func.coalesce(reviews.c.review_count, 0),
+        )
+        .outerjoin(Inventory, Inventory.product_id == Product.id)
+        .outerjoin(reviews, reviews.c.product_id == Product.id)
     )
 
 
@@ -40,6 +57,7 @@ def list_products(
     min_price: float | None = Query(default=None, ge=0),
     max_price: float | None = Query(default=None, ge=0),
     in_stock: bool | None = None,
+    min_rating: float | None = Query(default=None, ge=0, le=5),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -77,6 +95,13 @@ def list_products(
         stmt = stmt.where(Product.price >= min_price)
     if max_price is not None:
         stmt = stmt.where(Product.price <= max_price)
+    if min_rating is not None:
+        stmt = stmt.where(
+            select(func.avg(Review.rating))
+            .where(Review.product_id == Product.id)
+            .scalar_subquery()
+            >= min_rating
+        )
     if in_stock is True:
         stmt = stmt.where(Inventory.available_quantity > 0)
     elif in_stock is False:
@@ -94,8 +119,10 @@ def list_products(
             {
                 **ProductRead.model_validate(product).model_dump(mode="json"),
                 "available_quantity": quantity or 0,
+                "average_rating": round(float(average_rating or 0), 2),
+                "review_count": review_count,
             }
-            for product, quantity in rows
+            for product, quantity, average_rating, review_count in rows
         ],
         "page": page,
         "page_size": page_size,
@@ -130,9 +157,26 @@ def product_detail(product_id: str, db: Session = Depends(get_db)):
         .where(product_skin_concerns.c.product_id == product_id)
     ).all()
     inventory = db.get(Inventory, product_id)
+    average_rating, review_count = db.execute(
+        select(func.avg(Review.rating), func.count(Review.id)).where(
+            Review.product_id == product_id
+        )
+    ).one()
+    seller = db.execute(
+        select(SellerProfile.store_name, User.name)
+        .join(User, User.id == SellerProfile.user_id)
+        .where(SellerProfile.id == product.seller_id)
+    ).one_or_none()
+    category = db.get(Category, product.category_id) if product.category_id else None
     return {
         **ProductRead.model_validate(product).model_dump(mode="json"),
         "available_quantity": inventory.available_quantity if inventory else 0,
+        "average_rating": round(float(average_rating or 0), 2),
+        "review_count": review_count,
+        "seller": {"store_name": seller.store_name, "name": seller.name}
+        if seller
+        else None,
+        "category": category.name if category else None,
         "ingredients": [
             dict(
                 id=i.id,
