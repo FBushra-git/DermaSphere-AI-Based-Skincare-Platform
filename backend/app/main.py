@@ -4,7 +4,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import models  # noqa: F401 — load model metadata before table creation
-from app.api import admin, auth, catalog, products, profile, routines, seller, shop
+from app.api import (
+    admin,
+    assistant,
+    auth,
+    catalog,
+    education,
+    products,
+    profile,
+    reports,
+    routines,
+    seller,
+    shop,
+)
 from app.core.config import settings
 from app.core.database import Base, engine
 
@@ -36,6 +48,9 @@ app.include_router(shop.router)
 app.include_router(seller.router)
 app.include_router(routines.router)
 app.include_router(admin.router)
+app.include_router(assistant.router)
+app.include_router(education.router)
+app.include_router(reports.router)
 
 
 @app.get("/api/health", tags=["health"])

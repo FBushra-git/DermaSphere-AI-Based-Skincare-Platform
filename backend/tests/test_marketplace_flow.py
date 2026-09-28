@@ -237,3 +237,27 @@ def test_customer_seller_admin_flow(client_and_session):
         == 200
     )
     assert client.get("/api/seller/orders", headers=seller_headers).status_code == 200
+    assistant_response = client.post(
+        "/api/ai/chat",
+        headers=customer_headers,
+        json={"query": "ceramide moisturizer for dry skin", "limit": 3},
+    )
+    assert assistant_response.status_code == 200
+    assert assistant_response.json()["recommendations"][0]["id"] == product_id
+    assert "cannot diagnose" in assistant_response.json()["response"]
+    assert len(client.get("/api/ai/history", headers=customer_headers).json()) == 1
+
+    content = client.post(
+        "/api/admin/content",
+        headers=admin_headers,
+        json={
+            "title": "Skin barrier basics",
+            "category": "Guide",
+            "is_published": True,
+        },
+    )
+    assert content.status_code == 201
+    assert client.get("/api/content").json()[0]["title"] == "Skin barrier basics"
+    reports = client.get("/api/admin/reports/overview", headers=admin_headers)
+    assert reports.status_code == 200
+    assert reports.json()["total_users"] == 3

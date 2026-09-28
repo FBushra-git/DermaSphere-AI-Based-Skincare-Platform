@@ -141,3 +141,32 @@ class InventoryUpdate(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: str = Field(pattern="^(confirmed|processing|shipped|delivered)$")
+
+
+class AIChatInput(BaseModel):
+    query: str = Field(min_length=2, max_length=4000)
+    skin_type_id: str | None = None
+    skin_concern_ids: list[str] = Field(default_factory=list)
+    category_id: str | None = None
+    budget_max: Decimal | None = Field(
+        default=None, ge=0, max_digits=10, decimal_places=2
+    )
+    limit: int = Field(default=4, ge=1, le=10)
+
+
+class ContentCreate(BaseModel):
+    title: str = Field(min_length=3, max_length=180)
+    description: str | None = None
+    category: str = Field(min_length=2, max_length=80)
+    source: str | None = Field(default=None, max_length=180)
+    url: HttpUrl | None = None
+    is_published: bool = False
+
+
+class ContentUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=3, max_length=180)
+    description: str | None = None
+    category: str | None = Field(default=None, min_length=2, max_length=80)
+    source: str | None = Field(default=None, max_length=180)
+    url: HttpUrl | None = None
+    is_published: bool | None = None
