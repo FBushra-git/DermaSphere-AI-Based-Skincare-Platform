@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/components/AuthProvider";
 export const metadata: Metadata = {title:"DermaSphere — Your skin, your routine",description:"Thoughtful skincare, clear ingredient information, and routines that fit your skin."};
-export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){return <html lang="en"><body>{children}</body></html>}
+export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){return <html lang="en"><body><AuthProvider>{children}</AuthProvider></body></html>;}
