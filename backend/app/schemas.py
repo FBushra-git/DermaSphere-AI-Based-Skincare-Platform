@@ -30,6 +30,16 @@ class TokenRead(BaseModel):
     user: UserRead
 
 
+class AccountProfileUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    phone: str | None = Field(default=None, max_length=32)
+    address: str | None = Field(default=None, max_length=2000)
+
+
+class AccountStatusUpdate(BaseModel):
+    is_active: bool
+
+
 class ProductCreate(BaseModel):
     name: str = Field(min_length=2, max_length=180)
     brand: str = Field(min_length=1, max_length=120)
@@ -99,6 +109,14 @@ class IngredientCreate(NamedRecord):
     cautions: str | None = None
 
 
+class IngredientUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=150)
+    description: str | None = None
+    common_uses: str | None = None
+    benefits: str | None = None
+    cautions: str | None = None
+
+
 class CartItemInput(BaseModel):
     product_id: str
     quantity: int = Field(ge=1, le=99)
@@ -115,6 +133,10 @@ class CheckoutInput(BaseModel):
 class ReviewCreate(BaseModel):
     rating: int = Field(ge=1, le=5)
     body: str | None = Field(default=None, max_length=5000)
+
+
+class ReviewModeration(BaseModel):
+    is_reported: bool
 
 
 class RoutineCreate(BaseModel):
@@ -141,6 +163,10 @@ class InventoryUpdate(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: str = Field(pattern="^(confirmed|processing|shipped|delivered)$")
+
+
+class AdminOrderStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(confirmed|processing|shipped|delivered|cancelled)$")
 
 
 class AIChatInput(BaseModel):

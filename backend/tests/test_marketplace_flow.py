@@ -17,7 +17,16 @@ from app.api.deps import get_db
 from app.core.database import Base
 from app.core.security import hash_password
 from app.main import app
-from app.models import Ingredient, Order, OrderStatus, Role, SkinConcern, SkinType, User
+from app.models import (
+    Ingredient,
+    Inventory,
+    Order,
+    OrderStatus,
+    Role,
+    SkinConcern,
+    SkinType,
+    User,
+)
 
 
 @asynccontextmanager
@@ -261,3 +270,119 @@ def test_customer_seller_admin_flow(client_and_session):
     reports = client.get("/api/admin/reports/overview", headers=admin_headers)
     assert reports.status_code == 200
     assert reports.json()["total_users"] == 3
+
+
+def test_account_admin_tools_and_order_cancellation(client_and_session):
+    client, session_factory, _ = client_and_session
+    admin_headers = bearer(client, "admin@example.com", "admin-test-password-123")
+
+    seller_signup = client.post(
+        "/api/auth/register",
+        json={
+            "name": "Seller",
+            "email": "seller-admin@example.com",
+            "password": "seller-test-password-123",
+            "role": "seller",
+            "store_name": "Admin Test Store",
+        },
+    )
+    seller_headers = {"Authorization": f"Bearer {seller_signup.json()['access_token']}"}
+    product = client.post(
+        "/api/products",
+        headers=seller_headers,
+        json={
+            "name": "Order Test Cream",
+            "brand": "Test Lab",
+            "description": "A simple moisturizer for daily order processing checks.",
+            "price": "9.00",
+            "stock_quantity": 3,
+        },
+    ).json()
+    product_id = product["id"]
+    assert (
+        client.patch(
+            f"/api/admin/products/{product_id}/approve",
+            headers=admin_headers,
+            json={},
+        ).status_code
+        == 200
+    )
+
+    customer = client.post(
+        "/api/auth/register",
+        json={
+            "name": "Customer",
+            "email": "customer-admin@example.com",
+            "password": "customer-test-password-123",
+        },
+    ).json()
+    customer_headers = {"Authorization": f"Bearer {customer['access_token']}"}
+    profile = client.patch(
+        "/api/users/profile",
+        headers=customer_headers,
+        json={"name": "Updated Customer", "phone": "+880 1700 000000"},
+    )
+    assert profile.status_code == 200
+    assert profile.json()["name"] == "Updated Customer"
+
+    assert (
+        client.post(
+            "/api/cart/items",
+            headers=customer_headers,
+            json={"product_id": product_id, "quantity": 1},
+        ).status_code
+        == 201
+    )
+    customer_order = client.post(
+        "/api/orders",
+        headers=customer_headers,
+        json={"shipping_address": "9 Example Road, Dhaka"},
+    ).json()
+    assert (
+        client.post(
+            f"/api/orders/{customer_order['id']}/cancel",
+            headers=customer_headers,
+        ).status_code
+        == 200
+    )
+    with session_factory() as session:
+        inventory = session.get(Inventory, product_id)
+        assert inventory.available_quantity == 3
+
+    assert (
+        client.post(
+            "/api/cart/items",
+            headers=customer_headers,
+            json={"product_id": product_id, "quantity": 2},
+        ).status_code
+        == 201
+    )
+    admin_order = client.post(
+        "/api/orders",
+        headers=customer_headers,
+        json={"shipping_address": "9 Example Road, Dhaka"},
+    ).json()
+    assert (
+        client.patch(
+            f"/api/admin/orders/{admin_order['id']}/status",
+            headers=admin_headers,
+            json={"status": "cancelled"},
+        ).status_code
+        == 200
+    )
+    with session_factory() as session:
+        inventory = session.get(Inventory, product_id)
+        assert inventory.available_quantity == 3
+
+    assert client.get("/api/admin/users", headers=admin_headers).json()["total"] == 3
+    assert len(client.get("/api/admin/sellers", headers=admin_headers).json()) == 1
+    assert len(client.get("/api/admin/orders", headers=admin_headers).json()) == 2
+    assert (
+        client.patch(
+            f"/api/admin/products/{product_id}/archive",
+            headers=admin_headers,
+            json={"comment": "No longer listed"},
+        ).status_code
+        == 200
+    )
+    assert client.get(f"/api/products/{product_id}").status_code == 404

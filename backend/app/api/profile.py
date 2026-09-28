@@ -12,7 +12,7 @@ from app.models import (
     UserSkinProfile,
     profile_skin_concerns,
 )
-from app.schemas import ProfileUpdate
+from app.schemas import AccountProfileUpdate, ProfileUpdate
 
 router = APIRouter(prefix="/api/users", tags=["customer profile"])
 
@@ -110,3 +110,31 @@ def update_skin_profile(
         )
     db.commit()
     return get_skin_profile(db, user)
+
+
+@router.get("/profile")
+def get_account_profile(user: User = Depends(get_current_user)):
+    return {
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "phone": user.phone,
+        "address": user.address,
+        "is_active": user.is_active,
+        "created_at": user.created_at,
+    }
+
+
+@router.patch("/profile")
+def update_account_profile(
+    payload: AccountProfileUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    changes = payload.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        setattr(user, field, value.strip() if value else value)
+    db.commit()
+    db.refresh(user)
+    return get_account_profile(user)
