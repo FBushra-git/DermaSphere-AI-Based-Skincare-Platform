@@ -19,6 +19,7 @@ from app.models import (
     Role,
     SellerProfile,
     User,
+    product_ingredients,
 )
 from app.schemas import (
     AccountStatusUpdate,
@@ -422,6 +423,15 @@ def delete_ingredient(
     ingredient = db.get(Ingredient, ingredient_id)
     if not ingredient:
         raise HTTPException(status_code=404, detail="Ingredient not found")
+    references = db.scalar(
+        select(func.count())
+        .select_from(product_ingredients)
+        .where(product_ingredients.c.ingredient_id == ingredient.id)
+    )
+    if references:
+        raise HTTPException(
+            status_code=409, detail="Ingredient is still used by a product"
+        )
     db.delete(ingredient)
     try:
         db.commit()

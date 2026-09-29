@@ -141,6 +141,31 @@ def test_customer_seller_admin_flow(client_and_session):
     assert client.get("/api/products").json()["total"] == 0
 
     admin_headers = bearer(client, "admin@example.com", "admin-test-password-123")
+    category_create = client.post(
+        "/api/admin/categories",
+        headers=admin_headers,
+        json={"name": "Test Category", "description": "A test group."},
+    )
+    assert category_create.status_code == 201
+    category_id = category_create.json()["id"]
+    category_update = client.patch(
+        f"/api/admin/categories/{category_id}",
+        headers=admin_headers,
+        json={"name": "Hydration", "is_active": True},
+    )
+    assert category_update.status_code == 200
+    assert category_update.json()["name"] == "Hydration"
+    assert client.get("/api/admin/categories", headers=admin_headers).status_code == 200
+    assert (
+        client.delete(
+            f"/api/admin/categories/{category_id}", headers=admin_headers
+        ).status_code
+        == 204
+    )
+    assert all(
+        row["name"] != "Hydration" for row in client.get("/api/categories").json()
+    )
+
     seller_records = client.get("/api/admin/sellers", headers=admin_headers)
     assert seller_records.status_code == 200
     seller_record = seller_records.json()[0]
@@ -167,6 +192,12 @@ def test_customer_seller_admin_flow(client_and_session):
     assert ingredient_detail.status_code == 200
     assert ingredient_detail.json()["name"] == "Test Ceramide"
     assert ingredient_detail.json()["products"][0]["id"] == product_id
+    assert (
+        client.delete(
+            f"/api/admin/skin-types/{skin_type_id}", headers=admin_headers
+        ).status_code
+        == 409
+    )
     seller_edit = client.patch(
         f"/api/seller/products/{product_id}",
         headers=seller_headers,

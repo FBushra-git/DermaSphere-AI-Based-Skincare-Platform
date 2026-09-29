@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
@@ -14,11 +15,22 @@ from app.models import (
     SkinConcern,
     SkinType,
     User,
+    UserSkinProfile,
     product_ingredients,
+    product_skin_concerns,
+    product_skin_types,
+    profile_skin_concerns,
 )
-from app.schemas import IngredientCreate, NamedRecord
+from app.schemas import CatalogRecordUpdate, IngredientCreate, NamedRecord
 
 router = APIRouter(tags=["catalog"])
+
+
+@router.get("/api/admin/categories")
+def list_all_categories(
+    db: Session = Depends(get_db), _: User = Depends(require_roles(Role.ADMIN))
+):
+    return db.scalars(select(Category).order_by(Category.name)).all()
 
 
 @router.get("/api/categories")
@@ -80,6 +92,157 @@ def ingredient_detail(ingredient_id: str, db: Session = Depends(get_db)):
             for product, quantity in products
         ],
     }
+
+
+@router.patch("/api/admin/categories/{category_id}")
+def update_category(
+    category_id: str,
+    payload: CatalogRecordUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.ADMIN)),
+):
+    item = db.get(Category, category_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Category not found")
+    changes = payload.model_dump(exclude_unset=True)
+    if "name" in changes and db.scalar(
+        select(Category.id).where(
+            Category.id != item.id, Category.name.ilike(changes["name"].strip())
+        )
+    ):
+        raise HTTPException(status_code=409, detail="Category already exists")
+    for field, value in changes.items():
+        setattr(item, field, value.strip() if field == "name" and value else value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/api/admin/categories/{category_id}", status_code=204)
+def deactivate_category(
+    category_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.ADMIN)),
+):
+    item = db.get(Category, category_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Category not found")
+    item.is_active = False
+    db.commit()
+
+
+@router.patch("/api/admin/skin-types/{skin_type_id}")
+def update_skin_type(
+    skin_type_id: str,
+    payload: CatalogRecordUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.ADMIN)),
+):
+    item = db.get(SkinType, skin_type_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Skin type not found")
+    if payload.name and db.scalar(
+        select(SkinType.id).where(
+            SkinType.id != item.id, SkinType.name.ilike(payload.name.strip())
+        )
+    ):
+        raise HTTPException(status_code=409, detail="Skin type already exists")
+    changes = payload.model_dump(exclude_unset=True, exclude={"is_active"})
+    for field, value in changes.items():
+        setattr(item, field, value.strip() if field == "name" and value else value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/api/admin/skin-types/{skin_type_id}", status_code=204)
+def delete_skin_type(
+    skin_type_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.ADMIN)),
+):
+    item = db.get(SkinType, skin_type_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Skin type not found")
+    used_by_profile = db.scalar(
+        select(func.count())
+        .select_from(UserSkinProfile)
+        .where(UserSkinProfile.skin_type_id == item.id)
+    )
+    used_by_product = db.scalar(
+        select(func.count())
+        .select_from(product_skin_types)
+        .where(product_skin_types.c.skin_type_id == item.id)
+    )
+    if used_by_profile or used_by_product:
+        raise HTTPException(
+            status_code=409, detail="Skin type is referenced by a profile or product"
+        )
+    db.delete(item)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="Skin type is referenced by a profile or product"
+        ) from exc
+
+
+@router.patch("/api/admin/skin-concerns/{concern_id}")
+def update_skin_concern(
+    concern_id: str,
+    payload: CatalogRecordUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.ADMIN)),
+):
+    item = db.get(SkinConcern, concern_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Skin concern not found")
+    if payload.name and db.scalar(
+        select(SkinConcern.id).where(
+            SkinConcern.id != item.id, SkinConcern.name.ilike(payload.name.strip())
+        )
+    ):
+        raise HTTPException(status_code=409, detail="Skin concern already exists")
+    changes = payload.model_dump(exclude_unset=True, exclude={"is_active"})
+    for field, value in changes.items():
+        setattr(item, field, value.strip() if field == "name" and value else value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/api/admin/skin-concerns/{concern_id}", status_code=204)
+def delete_skin_concern(
+    concern_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.ADMIN)),
+):
+    item = db.get(SkinConcern, concern_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Skin concern not found")
+    used_by_product = db.scalar(
+        select(func.count())
+        .select_from(product_skin_concerns)
+        .where(product_skin_concerns.c.skin_concern_id == item.id)
+    )
+    used_by_profile = db.scalar(
+        select(func.count())
+        .select_from(profile_skin_concerns)
+        .where(profile_skin_concerns.c.skin_concern_id == item.id)
+    )
+    if used_by_profile or used_by_product:
+        raise HTTPException(
+            status_code=409, detail="Skin concern is referenced by a profile or product"
+        )
+    db.delete(item)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="Skin concern is referenced by a profile or product"
+        ) from exc
 
 
 @router.post("/api/admin/categories", status_code=201)
