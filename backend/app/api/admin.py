@@ -24,6 +24,7 @@ from app.models import (
 from app.schemas import (
     AccountStatusUpdate,
     AdminOrderStatusUpdate,
+    AdminRoleUpdate,
     IngredientUpdate,
     ProductDecision,
     ProductRead,
@@ -182,6 +183,56 @@ def list_users(
         "page": page,
         "page_size": page_size,
     }
+
+
+@router.patch("/users/{user_id}/role")
+def update_user_role(
+    user_id: str,
+    payload: AdminRoleUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(Role.ADMIN)),
+):
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    requested_role = Role(payload.role)
+    if target.id == admin.id and target.role != requested_role:
+        raise HTTPException(status_code=409, detail="You cannot change your own role")
+    if target.role == requested_role:
+        return {"id": target.id, "role": target.role}
+    if target.role == Role.ADMIN and requested_role != Role.ADMIN:
+        admin_count = db.scalar(
+            select(func.count()).select_from(User).where(User.role == Role.ADMIN)
+        )
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=409, detail="At least one administrator must remain"
+            )
+    existing_seller = db.scalar(
+        select(SellerProfile).where(SellerProfile.user_id == target.id)
+    )
+    if existing_seller and requested_role != Role.SELLER:
+        product_count = db.scalar(
+            select(func.count())
+            .select_from(Product)
+            .where(Product.seller_id == existing_seller.id)
+        )
+        if product_count:
+            raise HTTPException(
+                status_code=409,
+                detail="This seller has product records and cannot change roles",
+            )
+        db.delete(existing_seller)
+    elif requested_role == Role.SELLER and not existing_seller:
+        if not payload.store_name or not payload.store_name.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="A store name is required when assigning the seller role",
+            )
+        db.add(SellerProfile(user_id=target.id, store_name=payload.store_name.strip()))
+    target.role = requested_role
+    db.commit()
+    return {"id": target.id, "role": target.role}
 
 
 @router.patch("/users/{user_id}/status")

@@ -219,6 +219,14 @@ def test_customer_seller_admin_flow(client_and_session):
         ).status_code
         == 200
     )
+    assert (
+        client.patch(
+            f"/api/admin/users/{seller_signup.json()['user']['id']}/role",
+            headers=admin_headers,
+            json={"role": "customer"},
+        ).status_code
+        == 409
+    )
     seller_listing = client.get("/api/seller/products", headers=seller_headers)
     assert seller_listing.json()[0]["ingredient_ids"] == [ingredient_id]
     assert client.get("/api/ingredients/missing").status_code == 404
@@ -246,6 +254,21 @@ def test_customer_seller_admin_flow(client_and_session):
         },
     )
     assert profile.status_code == 200
+    promoted = client.patch(
+        f"/api/admin/users/{customer_signup.json()['user']['id']}/role",
+        headers=admin_headers,
+        json={"role": "seller", "store_name": "Customer Store"},
+    )
+    assert promoted.status_code == 200
+    assert promoted.json()["role"] == "seller"
+    assert (
+        client.patch(
+            f"/api/admin/users/{customer_signup.json()['user']['id']}/role",
+            headers=admin_headers,
+            json={"role": "customer"},
+        ).status_code
+        == 200
+    )
 
     assert (
         client.post(f"/api/wishlist/{product_id}", headers=customer_headers).status_code

@@ -36,6 +36,11 @@ class AccountProfileUpdate(BaseModel):
     address: str | None = Field(default=None, max_length=2000)
 
 
+class AdminRoleUpdate(BaseModel):
+    role: str = Field(pattern="^(customer|seller|admin)$")
+    store_name: str | None = Field(default=None, min_length=2, max_length=160)
+
+
 class AccountStatusUpdate(BaseModel):
     is_active: bool
 
