@@ -147,6 +147,29 @@ def test_customer_seller_admin_flow(client_and_session):
     assert ingredient_detail.status_code == 200
     assert ingredient_detail.json()["name"] == "Test Ceramide"
     assert ingredient_detail.json()["products"][0]["id"] == product_id
+    seller_edit = client.patch(
+        f"/api/seller/products/{product_id}",
+        headers=seller_headers,
+        json={
+            "name": "Barrier Cream Updated",
+            "ingredient_ids": [ingredient_id],
+            "skin_type_ids": [skin_type_id],
+            "skin_concern_ids": [concern_id],
+        },
+    )
+    assert seller_edit.status_code == 200
+    assert seller_edit.json()["status"] == "pending"
+    assert client.get("/api/products").json()["total"] == 0
+    assert (
+        client.patch(
+            f"/api/admin/products/{product_id}/approve",
+            headers=admin_headers,
+            json={"comment": "Updated listing reviewed"},
+        ).status_code
+        == 200
+    )
+    seller_listing = client.get("/api/seller/products", headers=seller_headers)
+    assert seller_listing.json()[0]["ingredient_ids"] == [ingredient_id]
     assert client.get("/api/ingredients/missing").status_code == 404
 
     customer_signup = client.post(
@@ -205,6 +228,17 @@ def test_customer_seller_admin_flow(client_and_session):
     )
     assert order_response.status_code == 201
     order_id = order_response.json()["id"]
+    seller_orders = client.get("/api/seller/orders", headers=seller_headers)
+    assert seller_orders.status_code == 200
+    assert seller_orders.json()[0]["can_manage_order"] is True
+    assert (
+        client.patch(
+            f"/api/seller/orders/{order_id}/status",
+            headers=seller_headers,
+            json={"status": "confirmed"},
+        ).json()["status"]
+        == "confirmed"
+    )
     with session_factory.begin() as session:
         order = session.get(Order, order_id)
         order.status = OrderStatus.DELIVERED

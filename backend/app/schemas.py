@@ -66,6 +66,9 @@ class ProductUpdate(BaseModel):
     benefits: str | None = None
     usage_instructions: str | None = None
     cautions: str | None = None
+    ingredient_ids: list[str] | None = None
+    skin_type_ids: list[str] | None = None
+    skin_concern_ids: list[str] | None = None
 
 
 class ProductRead(BaseModel):

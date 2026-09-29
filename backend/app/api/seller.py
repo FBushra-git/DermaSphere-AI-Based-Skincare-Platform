@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models import (
+    Category,
+    Ingredient,
     Inventory,
     Order,
     OrderItem,
@@ -15,7 +17,12 @@ from app.models import (
     ProductStatus,
     Role,
     SellerProfile,
+    SkinConcern,
+    SkinType,
     User,
+    product_ingredients,
+    product_skin_concerns,
+    product_skin_types,
 )
 from app.schemas import InventoryUpdate, OrderStatusUpdate, ProductRead, ProductUpdate
 
@@ -40,10 +47,32 @@ def list_my_products(
         .where(Product.seller_id == seller.id)
         .order_by(Product.created_at.desc())
     ).all()
+    product_ids = [product.id for product, _ in rows]
+    associations = {
+        "ingredient_ids": (product_ingredients, product_ingredients.c.ingredient_id),
+        "skin_type_ids": (product_skin_types, product_skin_types.c.skin_type_id),
+        "skin_concern_ids": (
+            product_skin_concerns,
+            product_skin_concerns.c.skin_concern_id,
+        ),
+    }
+    related: dict[str, dict[str, list[str]]] = {
+        product_id: {key: [] for key in associations} for product_id in product_ids
+    }
+    for key, (table, value_column) in associations.items():
+        if product_ids:
+            relation_rows = db.execute(
+                select(table.c.product_id, value_column).where(
+                    table.c.product_id.in_(product_ids)
+                )
+            )
+            for product_id, related_id in relation_rows:
+                related[product_id][key].append(related_id)
     return [
         {
             **ProductRead.model_validate(product).model_dump(mode="json"),
             "available_quantity": quantity or 0,
+            **related[product.id],
         }
         for product, quantity in rows
     ]
@@ -63,9 +92,48 @@ def update_my_product(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found in your store")
     changes = payload.model_dump(exclude_unset=True)
+    if product.status == ProductStatus.ARCHIVED:
+        raise HTTPException(
+            status_code=409, detail="Archived products cannot be edited"
+        )
+    if payload.category_id and not db.get(Category, payload.category_id):
+        raise HTTPException(status_code=422, detail="Category does not exist")
+    relationship_fields = {
+        "ingredient_ids": (product_ingredients, Ingredient, "ingredient_id"),
+        "skin_type_ids": (product_skin_types, SkinType, "skin_type_id"),
+        "skin_concern_ids": (product_skin_concerns, SkinConcern, "skin_concern_id"),
+    }
     for field, value in changes.items():
+        if field in relationship_fields or field in {
+            "ingredient_ids",
+            "skin_type_ids",
+            "skin_concern_ids",
+        }:
+            continue
         setattr(product, field, str(value) if field == "image_url" and value else value)
-    if changes and product.status == ProductStatus.APPROVED:
+    for field, (table, model, relation_column) in relationship_fields.items():
+        if field in changes:
+            related_ids = list(dict.fromkeys(changes[field] or []))
+            valid_ids = (
+                set(db.scalars(select(model.id).where(model.id.in_(related_ids))).all())
+                if related_ids
+                else set()
+            )
+            if valid_ids != set(related_ids):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"One or more {model.__tablename__} records do not exist",
+                )
+            db.execute(table.delete().where(table.c.product_id == product.id))
+            if related_ids:
+                db.execute(
+                    table.insert(),
+                    [
+                        {"product_id": product.id, relation_column: related_id}
+                        for related_id in related_ids
+                    ],
+                )
+    if changes and product.status in {ProductStatus.APPROVED, ProductStatus.REJECTED}:
         product.status = ProductStatus.PENDING
     db.commit()
     db.refresh(product)
@@ -114,6 +182,14 @@ def list_my_orders(
         .where(OrderItem.seller_id == seller.id)
         .order_by(Order.created_at.desc())
     ).all()
+    seller_sets: dict[str, set[str]] = {}
+    for order, _ in rows:
+        if order.id not in seller_sets:
+            seller_sets[order.id] = set(
+                db.scalars(
+                    select(OrderItem.seller_id).where(OrderItem.order_id == order.id)
+                ).all()
+            )
     return [
         {
             "order_id": order.id,
@@ -124,6 +200,7 @@ def list_my_orders(
             "quantity": item.quantity,
             "unit_price": item.unit_price,
             "line_total": item.unit_price * item.quantity,
+            "can_manage_order": seller_sets[order.id] == {seller.id},
         }
         for order, item in rows
     ]
