@@ -1,0 +1,15 @@
+﻿"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+import { DashboardFrame } from "@/components/DashboardFrame";
+import { ProtectedPage } from "@/components/ProtectedPage";
+import { apiRequest } from "@/lib/api";
+
+type SellerProfile={id:string;store_name:string;description:string|null;verification_status:string};
+const nav=[{label:"Overview",href:"/seller",icon:"⌂"},{label:"My products",href:"/seller#products",icon:"▦"},{label:"Add product",href:"/seller#add-product",icon:"＋"},{label:"Orders",href:"/seller#orders",icon:"▤"},{label:"Sales report",href:"/seller#sales",icon:"▥"},{label:"Store profile",href:"/seller/profile",icon:"⚙"}];
+export default function SellerProfilePage(){
+ const [profile,setProfile]=useState<SellerProfile|null>(null);const [notice,setNotice]=useState("");const [error,setError]=useState("");const [busy,setBusy]=useState(false);
+ useEffect(()=>{apiRequest<SellerProfile>("/api/seller/profile").then(setProfile).catch((reason:Error)=>setError(reason.message));},[]);
+ async function save(event:FormEvent<HTMLFormElement>){event.preventDefault();const data=new FormData(event.currentTarget);setBusy(true);setError("");setNotice("");try{const updated=await apiRequest<SellerProfile>("/api/seller/profile",{method:"PATCH",body:JSON.stringify({store_name:String(data.get("store_name")),description:String(data.get("description")||"")||null})});setProfile(updated);setNotice("Your store profile is saved.");}catch(reason){setError(reason instanceof Error?reason.message:"Could not save store details.");}finally{setBusy(false);}}
+ return <ProtectedPage role="seller"><DashboardFrame eyebrow="SELLER STUDIO" title="Store profile" nav={nav}><div className="dashboard-welcome"><div><span className="eyebrow">YOUR SELLER ACCOUNT</span><h2>Tell customers about your store.</h2><p>These details help customers recognize the seller behind each listing.</p></div></div>{notice&&<p className="inline-notice" role="status">{notice}</p>}{error&&<p className="form-error" role="alert">{error}</p>}<section className="dashboard-panel account-settings-panel"><span className="eyebrow">PUBLIC STORE INFORMATION</span><h2>Store details</h2>{profile?<form className="seller-profile-form" onSubmit={save}><label>Store name<input name="store_name" required minLength={2} maxLength={160} defaultValue={profile.store_name}/></label><label>Store description<textarea name="description" rows={6} maxLength={4000} defaultValue={profile.description??""} placeholder="Share a short introduction to your skincare store."/></label><div className="seller-verification"><span>Verification status</span><b className={`status-pill status-${profile.verification_status}`}>{profile.verification_status}</b><small>Only administrators can change verification status.</small></div><button className="button primary" type="submit" disabled={busy}>{busy?"Saving…":"Save store profile"}</button></form>:!error&&<p className="empty-state">Loading store details…</p>}</section></DashboardFrame></ProtectedPage>;
+}

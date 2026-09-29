@@ -23,6 +23,7 @@ const navigation = [
   { label: "Add product", href: "/seller#add-product", icon: "＋" },
   { label: "Orders", href: "/seller#orders", icon: "▤" },
   { label: "Sales report", href: "/seller#sales", icon: "▥" },
+  { label: "Store profile", href: "/seller/profile", icon: "settings" },
 ];
 const emptyDraft: ProductDraft = {
   name: "", brand: "", description: "", price: "", image_url: "", benefits: "",

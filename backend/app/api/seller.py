@@ -24,7 +24,13 @@ from app.models import (
     product_skin_concerns,
     product_skin_types,
 )
-from app.schemas import InventoryUpdate, OrderStatusUpdate, ProductRead, ProductUpdate
+from app.schemas import (
+    InventoryUpdate,
+    OrderStatusUpdate,
+    ProductRead,
+    ProductUpdate,
+    SellerProfileUpdate,
+)
 
 router = APIRouter(prefix="/api/seller", tags=["seller workspace"])
 
@@ -34,6 +40,38 @@ def get_seller(db: Session, user: User) -> SellerProfile:
     if not seller:
         raise HTTPException(status_code=404, detail="Seller profile not found")
     return seller
+
+
+@router.get("/profile")
+def seller_profile(
+    db: Session = Depends(get_db), user: User = Depends(require_roles(Role.SELLER))
+):
+    seller = get_seller(db, user)
+    return {
+        "id": seller.id,
+        "store_name": seller.store_name,
+        "description": seller.description,
+        "verification_status": seller.verification_status,
+    }
+
+
+@router.patch("/profile")
+def update_seller_profile(
+    payload: SellerProfileUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(Role.SELLER)),
+):
+    seller = get_seller(db, user)
+    seller.store_name = payload.store_name.strip()
+    seller.description = payload.description.strip() if payload.description else None
+    db.commit()
+    db.refresh(seller)
+    return {
+        "id": seller.id,
+        "store_name": seller.store_name,
+        "description": seller.description,
+        "verification_status": seller.verification_status,
+    }
 
 
 @router.get("/products")

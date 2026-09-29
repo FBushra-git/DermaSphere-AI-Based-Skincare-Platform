@@ -111,6 +111,16 @@ def test_customer_seller_admin_flow(client_and_session):
     )
     assert seller_signup.status_code == 201
     seller_headers = {"Authorization": f"Bearer {seller_signup.json()['access_token']}"}
+    seller_profile = client.patch(
+        "/api/seller/profile",
+        headers=seller_headers,
+        json={
+            "store_name": "Care Store Updated",
+            "description": "Gentle skin essentials.",
+        },
+    )
+    assert seller_profile.status_code == 200
+    assert seller_profile.json()["store_name"] == "Care Store Updated"
 
     product_response = client.post(
         "/api/products",

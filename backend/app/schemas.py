@@ -160,6 +160,11 @@ class RoutineItemInput(BaseModel):
     step_note: str | None = Field(default=None, max_length=255)
 
 
+class SellerProfileUpdate(BaseModel):
+    store_name: str = Field(min_length=2, max_length=160)
+    description: str | None = Field(default=None, max_length=4000)
+
+
 class InventoryUpdate(BaseModel):
     available_quantity: int = Field(ge=0)
 
