@@ -4,7 +4,7 @@ import { ProtectedPage } from "@/components/ProtectedPage";
 import { DashboardFrame, StatCards } from "@/components/DashboardFrame";
 import { apiRequest } from "@/lib/api";
 
-const nav = [{label:"Overview",href:"/customer",icon:"âŒ‚"},{label:"My skin profile",href:"/customer#skin-profile",icon:"â—Œ"},{label:"My routines",href:"/customer/routines",icon:"â˜¼"},{label:"Wishlist",href:"/wishlist",icon:"â™¡"},{label:"My orders",href:"/customer#orders",icon:"â–¤"},{label:"AI history",href:"/customer#ai-history",icon:"âœ³"}];
+const nav = [{label:"Overview",href:"/customer",icon:"âŒ‚"},{label:"My skin profile",href:"/customer#skin-profile",icon:"â—Œ"},{label:"My routines",href:"/customer/routines",icon:"â˜¼"},{label:"Wishlist",href:"/wishlist",icon:"â™¡"},{label:"My orders",href:"/customer#orders",icon:"â–¤"},{label:"Account settings",href:"/customer/settings",icon:"?"},{label:"AI history",href:"/customer#ai-history",icon:"âœ³"}];
 type Profile = { skin_type: {id:string;name:string}|null; skin_concerns: {id:string;name:string}[]; budget_min:string|null; budget_max:string|null; preferences:string|null };
 type RecordItem = {id:string;name:string;status?:string;created_at?:string;total_amount?:string;routine_type?:string;products?:unknown[];query?:string};
 const money = (value: unknown) => "$" + Number(value).toFixed(2);
