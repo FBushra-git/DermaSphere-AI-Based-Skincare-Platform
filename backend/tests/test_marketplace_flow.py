@@ -141,6 +141,16 @@ def test_customer_seller_admin_flow(client_and_session):
     assert client.get("/api/products").json()["total"] == 0
 
     admin_headers = bearer(client, "admin@example.com", "admin-test-password-123")
+    seller_records = client.get("/api/admin/sellers", headers=admin_headers)
+    assert seller_records.status_code == 200
+    seller_record = seller_records.json()[0]
+    verification = client.patch(
+        f"/api/admin/sellers/{seller_record['id']}/verification",
+        headers=admin_headers,
+        json={"verification_status": "verified"},
+    )
+    assert verification.status_code == 200
+    assert verification.json()["verification_status"] == "verified"
     assert (
         client.patch(
             f"/api/admin/products/{product_id}/approve",

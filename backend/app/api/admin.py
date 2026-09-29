@@ -27,6 +27,7 @@ from app.schemas import (
     ProductDecision,
     ProductRead,
     ReviewModeration,
+    SellerVerificationUpdate,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["administration"])
@@ -231,6 +232,21 @@ def list_sellers(
         }
         for seller, user in rows
     ]
+
+
+@router.patch("/sellers/{seller_id}/verification")
+def update_seller_verification(
+    seller_id: str,
+    payload: SellerVerificationUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.ADMIN)),
+):
+    seller = db.get(SellerProfile, seller_id)
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    seller.verification_status = payload.verification_status
+    db.commit()
+    return {"seller_id": seller.id, "verification_status": seller.verification_status}
 
 
 @router.patch("/products/{product_id}/archive")

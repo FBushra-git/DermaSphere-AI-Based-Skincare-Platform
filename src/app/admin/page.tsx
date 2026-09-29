@@ -4,7 +4,7 @@ import { ProtectedPage } from "@/components/ProtectedPage";
 import { DashboardFrame, StatCards } from "@/components/DashboardFrame";
 import { apiRequest } from "@/lib/api";
 
-const nav = [{label:"Overview",href:"/admin",icon:"⌂"},{label:"Users",href:"/admin#users",icon:"♙"},{label:"Product approvals",href:"/admin#approvals",icon:"✓"},{label:"Orders",href:"/admin#orders",icon:"▤"},{label:"Reports",href:"/admin/reports",icon:"⌁"},{label:"Content",href:"/admin/content",icon:"▧"}];
+const nav = [{label:"Overview",href:"/admin",icon:"home"},{label:"Users",href:"/admin#users",icon:"user"},{label:"Sellers",href:"/admin/sellers",icon:"store"},{label:"Product approvals",href:"/admin#approvals",icon:"check"},{label:"Orders",href:"/admin#orders",icon:"orders"},{label:"Reports",href:"/admin/reports",icon:"reports"},{label:"Content",href:"/admin/content",icon:"content"}];
 const money = (value: unknown) => "$" + Number(value).toFixed(2);
 
 export default function AdminDashboard() {
