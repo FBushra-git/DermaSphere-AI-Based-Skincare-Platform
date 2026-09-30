@@ -1,8 +1,9 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/components/AuthProvider";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, notifyCartUpdated } from "@/lib/api";
 
 const links = [
   ["Shop", "/products"],
@@ -18,13 +19,19 @@ export function Header() {
   const { user, logout } = useAuth();
 
   useEffect(() => {
-    if (user?.role === "customer") {
-      apiRequest<{ items: { quantity: number }[] }>("/api/cart")
-        .then(({ items }) => setCartCount(items.reduce((total, item) => total + item.quantity, 0)))
-        .catch(() => setCartCount(0));
-    } else {
-      setCartCount(0);
-    }
+    const refreshCartCount = () => {
+      if (user?.role === "customer") {
+        apiRequest<{ items: { quantity: number }[] }>("/api/cart")
+          .then(({ items }) => setCartCount(items.reduce((total, item) => total + item.quantity, 0)))
+          .catch(() => setCartCount(0));
+      } else {
+        setCartCount(0);
+      }
+    };
+
+    refreshCartCount();
+    window.addEventListener("dermasphere:cart-updated", refreshCartCount);
+    return () => window.removeEventListener("dermasphere:cart-updated", refreshCartCount);
   }, [user]);
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
@@ -49,7 +56,7 @@ export function Header() {
       </div>
       <header className="site-header">
         <Link className="wordmark" href="/" aria-label="DermaSphere home">
-          <i aria-hidden="true">✿</i> Derma<strong>Sphere</strong>
+          <Image src="/logo.png" alt="DermaSphere" width={140} height={42} priority />
         </Link>
         <button className="menu-toggle" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Toggle navigation">
           {open ? "×" : "☰"}

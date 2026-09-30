@@ -1,4 +1,5 @@
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+export function notifyCartUpdated() { if (typeof window !== "undefined") window.dispatchEvent(new Event("dermasphere:cart-updated")); }
 export class ApiError extends Error { constructor(message: string, public readonly status: number) { super(message); this.name = "ApiError"; } }
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
  const headers = new Headers(init.headers);
