@@ -73,11 +73,11 @@ export function Header() {
         </form>
         <div className="header-actions">
           <Link href={accountHref} aria-label={user ? "Your dashboard" : "Sign in"}>♙</Link>
-          <Link href={user?.role === "customer" ? "/wishlist" : "/login"} aria-label="Wishlist">♡</Link>
-          <Link href={user?.role === "customer" ? "/cart" : "/login"} aria-label={`Shopping bag, ${cartCount} items`}>
+          <Link href={user?.role === "customer" ? "/wishlist" : user ? accountHref : "/login?next=%2Fwishlist"} aria-label="Wishlist">♡</Link>
+          <Link href={user?.role === "customer" ? "/cart" : user ? accountHref : "/login?next=%2Fcart"} aria-label={`Shopping bag, ${cartCount} items`}>
             ♧<small>{cartCount}</small>
           </Link>
-          <Link className="ai-link" href={user ? "/assistant" : "/login"}>✳ &nbsp;Ask DermaSphere AI</Link>
+          <Link className="ai-link" href={user ? "/assistant" : "/login?next=%2Fassistant"}>✳ &nbsp;Ask DermaSphere AI</Link>
           {user ? (
             <button className="header-signout" onClick={logout} aria-label="Sign out">↪</button>
           ) : (
